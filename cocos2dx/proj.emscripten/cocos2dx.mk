@@ -23,8 +23,10 @@ CXX := EMSCRIPTEN=$(EMSCRIPTEN_ROOT) $(COCOS_ROOT)/external/emscripten/em++
 # XXX: Not entirely sure why main, malloc and free need to be explicitly listed
 # here, but after adding a --js-library library, these symbols seem to get
 # stripped unless enumerated here.
-EXPORTED_FLAGS := -s EXPORTED_FUNCTIONS="['_CCTextureCacheEmscripten_addImageAsyncCallBack','_CCTextureCacheEmscripten_preMultiplyImageRegion','_malloc','_free','_main']"
-JSLIBS := --js-library $(COCOS_SRC)/platform/emscripten/CCTextureCacheEmscripten.js
+COCOS_EXPORTED_FUNCTIONS := _CCTextureCacheEmscripten_addImageAsyncCallBack _CCTextureCacheEmscripten_preMultiplyImageRegion _malloc _free _main
+EXPORTED_FUNCTIONS := $(EXPORTED_FUNCTIONS) $(COCOS_EXPORTED_FUNCTIONS)
+EXPORTED_FLAGS := -s EXPORTED_FUNCTIONS="$(shell python -c 'import sys; print sys.argv[1:]' $(EXPORTED_FUNCTIONS))"
+JSLIBS += --js-library $(COCOS_SRC)/platform/emscripten/CCTextureCacheEmscripten.js
 
 CCFLAGS += -MMD -Wall -fPIC -Qunused-arguments -Wno-overloaded-virtual -Qunused-variable -s TOTAL_MEMORY=268435456 -s VERBOSE=1 -U__native_client__ $(EXPORTED_FLAGS) $(JSLIBS)
 CXXFLAGS += -MMD -Wall -fPIC -Qunused-arguments -Wno-overloaded-virtual -Qunused-variable -s TOTAL_MEMORY=268435456 -s VERBOSE=1 -U__native_client__ $(EXPORTED_FLAGS) $(JSLIBS)
