@@ -45,8 +45,31 @@ THE SOFTWARE.
 #include "SimpleAudioEngine.h"
 #include "cocos2d.h"
 
-#include <SDL/SDL.h>
-#include <SDL/SDL_mixer.h>
+extern "C" {
+    // Methods implemented in SimpleAudioEngine.js
+    void SimpleAudioEngine_init();
+
+    void SimpleAudioEngine_rewindBackgroundMusic();
+    void SimpleAudioEngine_preloadEffect(const char *);
+    int SimpleAudioEngine_playEffect(const char *, int);
+    void SimpleAudioEngine_stopEffect(int);
+    void SimpleAudioEngine_setEffectsVolume(int);
+    void SimpleAudioEngine_pauseEffect(int);
+    void SimpleAudioEngine_resumeEffect(int);
+    void SimpleAudioEngine_pauseAllEffects();
+    void SimpleAudioEngine_resumeAllEffects();
+    void SimpleAudioEngine_stopAllEffects();
+
+    void SimpleAudioEngine_preloadBackgroundMusic(const char *);
+    int SimpleAudioEngine_isBackgroundMusicPlaying();
+    void SimpleAudioEngine_playBackgroundMusic(const char *, int);
+    void SimpleAudioEngine_pauseBackgroundMusic();
+    void SimpleAudioEngine_resumeBackgroundMusic();
+    void SimpleAudioEngine_stopBackgroundMusic();
+    void SimpleAudioEngine_setBackgroundMusicVolume(int);
+
+    void SimpleAudioEngine_end();
+};
 
 USING_NS_CC;
 
@@ -54,250 +77,151 @@ using namespace std;
 
 namespace CocosDenshion
 {
-	struct soundData {
-        Mix_Chunk *chunk;
-		bool   isLooped;
-	};
-
-	typedef map<string, soundData *> EffectsMap;
-	EffectsMap s_effects;
     float s_effectsVolume = 1.0;
-
-	typedef enum {
-		PLAYING,
-		STOPPED,
-		PAUSED,
-	} playStatus;
-
-	struct backgroundMusicData {
-		Mix_Music *music;
-	};
-	typedef map<string, backgroundMusicData *> BackgroundMusicsMap;
-	BackgroundMusicsMap s_backgroundMusics;
     float s_backgroundVolume = 1.0;
+    static SimpleAudioEngine  *s_engine = 0;
 
-	static SimpleAudioEngine  *s_engine = 0;
-
-    // Unfortunately this is just hard-coded in Emscripten's SDL
-    // implementation.
-    static const int NR_CHANNELS = 32;
     static void stopBackground(bool bReleaseData)
     {
-        SimpleAudioEngine *engine = SimpleAudioEngine::sharedEngine();
-        engine->stopBackgroundMusic();
+        SimpleAudioEngine_stopBackgroundMusic();
     }
 
-	SimpleAudioEngine::SimpleAudioEngine()
-	{
-	}
+    SimpleAudioEngine::SimpleAudioEngine()
+    {
+        SimpleAudioEngine_init();
+    }
 
-	SimpleAudioEngine::~SimpleAudioEngine()
-	{
-	}
+    SimpleAudioEngine::~SimpleAudioEngine()
+    {
+    }
 
-	SimpleAudioEngine* SimpleAudioEngine::sharedEngine()
-	{
-		if (!s_engine)
-			s_engine = new SimpleAudioEngine();
+    SimpleAudioEngine* SimpleAudioEngine::sharedEngine()
+    {
+        if (!s_engine)
+            s_engine = new SimpleAudioEngine();
         
-		return s_engine;
-	}
+        return s_engine;
+    }
 
-	void SimpleAudioEngine::end()
-	{
-		// clear all the sounds
-	    EffectsMap::const_iterator end = s_effects.end();
-	    for (EffectsMap::iterator it = s_effects.begin(); it != end; it++)
-	    {
-            Mix_FreeChunk(it->second->chunk);
-			delete it->second;
-	    }
-	    s_effects.clear();
+    void SimpleAudioEngine::end()
+    {
+        SimpleAudioEngine_end();
+    }
 
-		// and the background too
-		stopBackground(true);
-
-		for (BackgroundMusicsMap::iterator it = s_backgroundMusics.begin(); it != s_backgroundMusics.end(); ++it)
-		{
-            Mix_FreeMusic(it->second->music);
-			delete it->second;
-		}
-		s_backgroundMusics.clear();
-	}
-
-	//
-	// background audio
-	//
+    //
+    // background audio
+    //
     void SimpleAudioEngine::preloadBackgroundMusic(const char* pszFilePath)
-	{
-	}
+    {
+        SimpleAudioEngine_preloadBackgroundMusic(pszFilePath);
+    }
 
-	void SimpleAudioEngine::playBackgroundMusic(const char* pszFilePath, bool bLoop)
-	{
-        std::string key = std::string(pszFilePath);
-        struct backgroundMusicData *musicData;
-        if(!s_backgroundMusics.count(key))
-        {
-            musicData = new struct backgroundMusicData();
-            musicData->music = Mix_LoadMUS(pszFilePath);
-            s_backgroundMusics[key] = musicData;
-        }
-        else
-        {
-            musicData = s_backgroundMusics[key];
-        }
+    void SimpleAudioEngine::playBackgroundMusic(const char* pszFilePath, bool bLoop)
+    {
+        SimpleAudioEngine_playBackgroundMusic(pszFilePath, bLoop);
+    }
 
-        Mix_PlayMusic(musicData->music, bLoop ? -1 : 0);
-	}
+    void SimpleAudioEngine::stopBackgroundMusic(bool bReleaseData)
+    {
+        SimpleAudioEngine_stopBackgroundMusic();
+    }
 
-	void SimpleAudioEngine::stopBackgroundMusic(bool bReleaseData)
-	{
-        Mix_HaltMusic();
-	}
+    void SimpleAudioEngine::pauseBackgroundMusic()
+    {
+        SimpleAudioEngine_pauseBackgroundMusic();
+    }
 
-	void SimpleAudioEngine::pauseBackgroundMusic()
-	{
-        Mix_PauseMusic();
-	}
+    void SimpleAudioEngine::resumeBackgroundMusic()
+    {
+        SimpleAudioEngine_resumeBackgroundMusic();
+    } 
 
-	void SimpleAudioEngine::resumeBackgroundMusic()
-	{
-        Mix_ResumeMusic();
-	} 
+    void SimpleAudioEngine::rewindBackgroundMusic()
+    {
+        SimpleAudioEngine_rewindBackgroundMusic();
+    }
 
-	void SimpleAudioEngine::rewindBackgroundMusic()
-	{
-        CCLOGWARN("Cannot rewind background in Emscripten");
-	}
+    bool SimpleAudioEngine::willPlayBackgroundMusic()
+    {
+        return true;
+    }
 
-	bool SimpleAudioEngine::willPlayBackgroundMusic()
-	{
-		return true;
-	}
+    bool SimpleAudioEngine::isBackgroundMusicPlaying()
+    {
+        return SimpleAudioEngine_isBackgroundMusicPlaying();
+    }
 
-	bool SimpleAudioEngine::isBackgroundMusicPlaying()
-	{
-        return Mix_PlayingMusic();
-	}
-
-	float SimpleAudioEngine::getBackgroundMusicVolume()
-	{
+    float SimpleAudioEngine::getBackgroundMusicVolume()
+    {
         return s_backgroundVolume;
-	}
+    }
 
-	void SimpleAudioEngine::setBackgroundMusicVolume(float volume)
-	{
+    void SimpleAudioEngine::setBackgroundMusicVolume(float volume)
+    {
         // Ensure volume is between 0.0 and 1.0.
         volume = volume > 1.0 ? 1.0 : volume;
         volume = volume < 0.0 ? 0.0 : volume;
 
-        Mix_VolumeMusic(volume * MIX_MAX_VOLUME);
+        SimpleAudioEngine_setBackgroundMusicVolume((int) (volume * 100));
         s_backgroundVolume = volume;
-	}
+    }
 
-	float SimpleAudioEngine::getEffectsVolume()
-	{
-		return s_effectsVolume;
-	}
+    float SimpleAudioEngine::getEffectsVolume()
+    {
+        return s_effectsVolume;
+    }
 
-	void SimpleAudioEngine::setEffectsVolume(float volume)
-	{
+    void SimpleAudioEngine::setEffectsVolume(float volume)
+    {
         volume = volume > 1.0 ? 1.0 : volume;
         volume = volume < 0.0 ? 0.0 : volume;
-
-        // Need to set volume on every channel. SDL will then read this volume
-        // level and apply it back to the individual sample.
-        for(int i = 0; i < NR_CHANNELS; i++)
-        {
-            Mix_Volume(i, volume * MIX_MAX_VOLUME);
-        }
-
+        SimpleAudioEngine_setEffectsVolume((int) (volume * 100));
         s_effectsVolume = volume;
-	}
+    }
 
-	unsigned int SimpleAudioEngine::playEffect(const char* pszFilePath, bool bLoop)
-	{
-        std::string key = std::string(pszFilePath);
-        struct soundData *sound;
-        if(!s_effects.count(key))
-        {
-            sound = new struct soundData();
-            sound->chunk = Mix_LoadWAV(pszFilePath);
-            sound->isLooped = bLoop;
-            s_effects[key] = sound;
-        }
-        else
-        {
-            sound = s_effects[key];
-        }
-        // This is safe here since Emscripten is just passing back an
-        // incrementing integer each time you use the Mix_LoadWAV method.
-        unsigned int result = (unsigned int) sound->chunk;
+    unsigned int SimpleAudioEngine::playEffect(const char* pszFilePath, bool bLoop)
+    {
+        return SimpleAudioEngine_playEffect(pszFilePath, bLoop);
+    }
 
-        // XXX: This is a bit of a hack, but... Choose a channel based on the
-        // modulo of the # of channels. This allows us to set the volume
-        // without passing around both chunk address and channel.
-        Mix_PlayChannel(result % NR_CHANNELS, sound->chunk, bLoop ? -1 : 0);
+    void SimpleAudioEngine::stopEffect(unsigned int nSoundId)
+    {
+        SimpleAudioEngine_stopEffect(nSoundId);
+    }
 
-        return result;
-	}
+    void SimpleAudioEngine::preloadEffect(const char* pszFilePath)
+    {
+        SimpleAudioEngine_preloadEffect(pszFilePath);
+    }
 
-	void SimpleAudioEngine::stopEffect(unsigned int nSoundId)
-	{
-        Mix_HaltChannel(nSoundId % NR_CHANNELS);
-	}
+    void SimpleAudioEngine::unloadEffect(const char* pszFilePath)
+    {
+        // This doesn't make as much sense here. Just ignore.
+    }
 
-	void SimpleAudioEngine::preloadEffect(const char* pszFilePath)
-	{
-	}
+    void SimpleAudioEngine::pauseEffect(unsigned int nSoundId)
+    {
+        SimpleAudioEngine_pauseEffect(nSoundId);
+    }
 
-	void SimpleAudioEngine::unloadEffect(const char* pszFilePath)
-	{
-        std::string key = std::string(pszFilePath);
-        if(!s_effects.count(key))
-        {
-            return;
-        }
+    void SimpleAudioEngine::pauseAllEffects()
+    {
+        SimpleAudioEngine_pauseAllEffects();
+    }
 
-        struct soundData *sound = s_effects[key];
+    void SimpleAudioEngine::resumeEffect(unsigned int nSoundId)
+    {
+        SimpleAudioEngine_resumeEffect(nSoundId);
+    }
 
-        Mix_FreeChunk(sound->chunk);
-        delete sound;
-        s_effects.erase(key);
-	}
-
-	void SimpleAudioEngine::pauseEffect(unsigned int nSoundId)
-	{
-        Mix_Pause(nSoundId % NR_CHANNELS);
-	}
-
-	void SimpleAudioEngine::pauseAllEffects()
-	{
-        for(int i = 0; i < NR_CHANNELS; i++)
-        {
-            Mix_Pause(i);
-        }
-	}
-
-	void SimpleAudioEngine::resumeEffect(unsigned int nSoundId)
-	{
-        Mix_Resume(nSoundId % NR_CHANNELS);
-	}
-
-	void SimpleAudioEngine::resumeAllEffects()
-	{
-        for(int i = 0; i < NR_CHANNELS; i++)
-        {
-            Mix_Resume(i);
-        }
-	}
+    void SimpleAudioEngine::resumeAllEffects()
+    {
+        SimpleAudioEngine_resumeAllEffects();
+    }
 
     void SimpleAudioEngine::stopAllEffects()
     {
-        for(int i = 0; i < NR_CHANNELS; i++)
-        {
-            Mix_HaltChannel(i);
-        }
+        SimpleAudioEngine_stopAllEffects();
     }
 
 }

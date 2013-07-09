@@ -23,13 +23,29 @@ CXX := EMSCRIPTEN=$(EMSCRIPTEN_ROOT) $(COCOS_ROOT)/external/emscripten/em++
 # XXX: Not entirely sure why main, malloc and free need to be explicitly listed
 # here, but after adding a --js-library library, these symbols seem to get
 # stripped unless enumerated here.
-COCOS_EXPORTED_FUNCTIONS := _CCTextureCacheEmscripten_addImageAsyncCallBack _CCTextureCacheEmscripten_preMultiplyImageRegion _malloc _free _main
+COCOS_EXPORTED_FUNCTIONS := \
+	_CCTextureCacheEmscripten_addImageAsyncCallBack \
+	_CCTextureCacheEmscripten_preMultiplyImageRegion \
+	\
+	_malloc \
+	_free \
+	_main
+
 EXPORTED_FUNCTIONS := $(EXPORTED_FUNCTIONS) $(COCOS_EXPORTED_FUNCTIONS)
 EXPORTED_FLAGS := -s EXPORTED_FUNCTIONS="$(shell python -c 'import sys; print sys.argv[1:]' $(EXPORTED_FUNCTIONS))"
-JSLIBS += --js-library $(COCOS_SRC)/platform/emscripten/CCTextureCacheEmscripten.js
 
-CCFLAGS += -MMD -Wall -fPIC -Qunused-arguments -Wno-overloaded-virtual -Qunused-variable -s TOTAL_MEMORY=268435456 -s VERBOSE=1 -U__native_client__ $(EXPORTED_FLAGS) $(JSLIBS)
-CXXFLAGS += -MMD -Wall -fPIC -Qunused-arguments -Wno-overloaded-virtual -Qunused-variable -s TOTAL_MEMORY=268435456 -s VERBOSE=1 -U__native_client__ $(EXPORTED_FLAGS) $(JSLIBS)
+JSLIBS += \
+	--js-library $(COCOS_SRC)/platform/emscripten/CCTextureCacheEmscripten.js \
+	--js-library $(COCOS_ROOT)/CocosDenshion/emscripten/SimpleAudioEngine.js
+
+PRE_JS += \
+	--pre-js $(COCOS_ROOT)/external/soundmanager2/script/soundmanager2.js
+
+COMPILER_FLAGS := -MMD -Wall -fPIC -Qunused-arguments -Wno-overloaded-virtual -Qunused-variable -U__native_client__
+EMSCRIPTEN_FLAGS := -s TOTAL_MEMORY=268435456 -s VERBOSE=1
+
+CCFLAGS += $(COMPILER_FLAGS) $(EMSCRIPTEN_FLAGS) $(EXPORTED_FLAGS) $(JSLIBS) $(PRE_JS)
+CXXFLAGS += $(COMPILER_FLAGS) $(EMSCRIPTEN_FLAGS) $(EXPORTED_FLAGS) $(JSLIBS) $(PRE_JS)
 
 LIB_DIR = $(COCOS_SRC)/lib/emscripten
 BIN_DIR = bin
@@ -59,9 +75,6 @@ OBJ_DIR := $(OBJ_DIR)/debug
 LIB_DIR := $(LIB_DIR)/debug
 BIN_DIR := $(BIN_DIR)/debug
 else
-# Async image loading code incompatible with asm.js for now. Disable until
-# we've had time to investigate. --closure 0 so that symbols don't get mangled,
-# rendering them inaccessible from JS code.
 CCFLAGS += -O2 --jcache -s GL_UNSAFE_OPTS=0 -s ASM_JS=1
 CXXFLAGS += -O2 --jcache -s GL_UNSAFE_OPTS=0 -s ASM_JS=1
 DEFINES += -DNDEBUG -DCP_USE_DOUBLES=0
@@ -108,7 +121,11 @@ clean:
 ifdef EXECUTABLE
 TARGET := $(BIN_DIR)/$(EXECUTABLE)
 
-all: $(TARGET).js $(TARGET).data $(BIN_DIR)/index.html
+all: $(TARGET).js $(TARGET).data $(BIN_DIR)/index.html $(BIN_DIR)/soundmanager2_flash9.swf
+
+$(BIN_DIR)/soundmanager2_flash9.swf: $(COCOS_ROOT)/external/soundmanager2/./swf/soundmanager2_flash9.swf
+	@mkdir -p $(@D)
+	cp $< $@
 
 run: $(TARGET)
 	cd $(dir $^) && ./$(notdir $^)

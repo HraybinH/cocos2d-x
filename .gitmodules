@@ -13,3 +13,6 @@
 [submodule "tools/cocos2d-console"]
 	path = tools/cocos2d-console
 	url = https://github.com/cocos2d/cocos2d-console.git
+[submodule "external/soundmanager2"]
+	path = external/soundmanager2
+	url = https://github.com/scottschiller/SoundManager2.git

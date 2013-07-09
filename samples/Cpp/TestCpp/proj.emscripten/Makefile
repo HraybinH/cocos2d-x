@@ -100,7 +100,7 @@ SOURCES = ../Classes/AccelerometerTest/AccelerometerTest.cpp \
 
 RESOURCE_PATH = ../Resources
 
-RESOURCES := $(shell (cd $(RESOURCE_PATH); find . -type f ! -name '* *'))
+RESOURCES := $(shell (cd $(RESOURCE_PATH); find . -type f ! -name '* *' ! -name '*.mp3'))
 
 SHAREDLIBS = -lcocos2d -lcocosdenshion
 COCOS_LIBS = $(LIB_DIR)/libcocos2d.so $(LIB_DIR)/libcocosdenshion.so
