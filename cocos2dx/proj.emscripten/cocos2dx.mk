@@ -121,14 +121,28 @@ clean:
 ifdef EXECUTABLE
 TARGET := $(BIN_DIR)/$(EXECUTABLE)
 
-all: $(TARGET).js $(TARGET).data $(BIN_DIR)/index.html $(BIN_DIR)/soundmanager2_flash9.swf
+all: $(TARGET).js $(TARGET).data $(BIN_DIR)/index.html swfs
 
-$(BIN_DIR)/soundmanager2_flash9.swf: $(COCOS_ROOT)/external/soundmanager2/./swf/soundmanager2_flash9.swf
+swfs: $(BIN_DIR)/soundmanager2.swf $(BIN_DIR)/soundmanager2_debug.swf $(BIN_DIR)/soundmanager2_flash9.swf $(BIN_DIR)/soundmanager2_flash9_debug.swf
+
+$(BIN_DIR)/soundmanager2.swf: $(COCOS_ROOT)/external/soundmanager2/swf/soundmanager2.swf
+	@mkdir -p $(@D)
+	cp $< $@
+
+$(BIN_DIR)/soundmanager2_debug.swf: $(COCOS_ROOT)/external/soundmanager2/swf/soundmanager2_debug.swf
+	@mkdir -p $(@D)
+	cp $< $@
+
+$(BIN_DIR)/soundmanager2_flash9.swf: $(COCOS_ROOT)/external/soundmanager2/swf/soundmanager2_flash9.swf
+	@mkdir -p $(@D)
+	cp $< $@
+
+$(BIN_DIR)/soundmanager2_flash9_debug.swf: $(COCOS_ROOT)/external/soundmanager2/swf/soundmanager2_flash9_debug.swf
 	@mkdir -p $(@D)
 	cp $< $@
 
 run: $(TARGET)
 	cd $(dir $^) && ./$(notdir $^)
 
-.PHONY: run
+.PHONY: run swfs
 endif
