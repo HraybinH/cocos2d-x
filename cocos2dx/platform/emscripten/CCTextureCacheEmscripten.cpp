@@ -99,7 +99,6 @@ void CCTextureCacheEmscripten_preMultiplyImageRegion(
     unsigned char *out, int wout, int hout, // Output image, its width and height
     int xout, int yout) // x and y offsets into the output image
 {
-    int iter = 0;
     for(int j = 0; j < hin; j++)
     {
         for(int i = 0; i < win; i++)
