@@ -149,13 +149,14 @@ var LibraryCocosHelper = {
                 this.cxxTextureCache = cxxTextureCache;
                 this.operationQueue = new cocos2dx.classes.AsyncOperationQueue();
 
-                // Since there will only ever be one image being processed at a time,
-                // we pre-initialize a canvas object and use it for all operations so
-                // as to save doing this for every image, incurring (probably) both
-                // compute work and memory fragmentation.
-                this.canvas = document.createElement('canvas');
-                this.ctx = this.canvas.getContext('2d');
-
+                // Note: Chrome renders using hardware for any offscreen canvas
+                // > 65536px (256x256, for instance). This results in a
+                // glReadPixels call to fetch the image data back in
+                // getImageData(), which is extremely slow. Consequently our
+                // stategy here is to use small canvases which are safely under
+                // this threshold so that all the image data stays on host
+                // memory. This results in a ~10X performance improvement on
+                // image loads.
                 this.regionSize = 128;
 
                 /**
@@ -169,15 +170,23 @@ var LibraryCocosHelper = {
                     var rw = Math.min(args.i + this.regionSize, args.w) - args.i;
                     var rh = Math.min(args.j + this.regionSize, args.h) - args.j;
 
-                    this.ctx.drawImage(args.img, args.i, args.j, rw, rh, args.i, args.j, rw, rh);
+                    var canvas = document.createElement('canvas');
+                    canvas.width = rw;
+                    canvas.height = rh;
 
-                    var imgData = this.ctx.getImageData(args.i, args.j, rw, rh);
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(args.img, args.i, args.j, rw, rh, 0, 0, rw, rh);
+
+                    var imgData = ctx.getImageData(0, 0, rw, rh);
                     var inImgData = _malloc(rw * rh * 4);
                     Module.HEAP8.set(imgData.data, inImgData);
 
                     // Call into C++ code in CCTextureCacheEmscripten.cpp to do the actual
                     // copy and pre-multiply.
-                    _CCTextureCacheEmscripten_preMultiplyImageRegion(inImgData, rw, rh, args.outImgData, args.w, args.h, args.i, args.j);
+                    _CCTextureCacheEmscripten_preMultiplyImageRegion(
+                        inImgData, rw, rh,
+                        args.outImgData, args.w, args.h,
+                        args.i, args.j);
 
                     _free(inImgData);
                 };
@@ -199,19 +208,6 @@ var LibraryCocosHelper = {
                     {
                         var w = img.width;
                         var h = img.height;
-
-                        // Setup the canvas in the queue also so that it happens in order
-                        // with the operations that depend on the canvas having been
-                        // configured to this resolution. We can get away with this since
-                        // the queue guarantees that operations are executed in the order
-                        // in which they are enqueued.
-                        var setupCanvas = function(args)
-                        {
-                            that.canvas.width = args.w;
-                            that.canvas.height = args.h;
-                        };
-                        that.operationQueue.enqueue(setupCanvas, { w: w, h: h });
-
                         var outImgData = _malloc(w * h * 4);
 
                         for(var i = 0; i < w; i += that.regionSize)
