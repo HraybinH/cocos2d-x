@@ -175,6 +175,7 @@ var LibrarySimpleAudioEngine = {
         });
     },
 
+    SimpleAudioEngine_playBackgroundMusic__deps: [ 'SimpleAudioEngine_stopBackgroundMusic' ],
     SimpleAudioEngine_playBackgroundMusic: function(filenameP, loop)
     {
         var filename = Pointer_stringify(filenameP);
@@ -200,10 +201,6 @@ var LibrarySimpleAudioEngine = {
             }
             else
             {
-
-            // Stop all playing music before starting up new music.
-            //_SimpleAudioEngine_stopBackgroundMusic();
-
                 sound.play({
                     loops: loops,
                     volume: Module.CocosDensionState.musicVolume
