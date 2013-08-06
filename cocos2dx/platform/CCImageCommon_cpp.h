@@ -92,6 +92,9 @@ bool CCImage::initWithImageFile(const char * strPath, EImageFormat eImgFmt/* = e
     bool bRet = false;
 
 #ifdef EMSCRIPTEN
+    // NOTE: we are assuming that images loaded via this mechanism are
+    // pre-multiplied at build time. No pre-multiply step is performed here.
+    //
     // Emscripten includes a re-implementation of SDL that uses HTML5 canvas
     // operations underneath. Consequently, loading images via IMG_Load (an SDL
     // API) will be a lot faster than running libpng et al as compiled with
@@ -100,14 +103,6 @@ bool CCImage::initWithImageFile(const char * strPath, EImageFormat eImgFmt/* = e
 
     int size = 4 * (iSurf->w * iSurf->h);
     bRet = initWithRawData((void*)iSurf->pixels, size, iSurf->w, iSurf->h, 8, true);
-
-    unsigned int *tmp = (unsigned int *)m_pData;
-    int nrPixels = iSurf->w * iSurf->h;
-    for(int i = 0; i < nrPixels; i++)
-    {
-        unsigned char *p = m_pData + i * 4;
-        tmp[i] = CC_RGB_PREMULTIPLY_ALPHA( p[0], p[1], p[2], p[3] );
-    }
 
     SDL_FreeSurface(iSurf);
 #else

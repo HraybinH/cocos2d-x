@@ -146,6 +146,14 @@ var LibraryCocosHelper = {
              */
             AsyncImageLoader: function(cxxTextureCache)
             {
+                // NOTE: cocos-emscripten now expects all alpha images to be
+                // pre-multiplied at COMPILE TIME. This is a breaking change vs
+                // previously published versions. Samples have been updated to
+                // show how to do this. If you have legacy code that relies on
+                // the runtime pre-multiplying behavior, then switch this to
+                // true to get the old behavior.
+                this.runtimePremultiply = false;
+
                 this.cxxTextureCache = cxxTextureCache;
                 this.operationQueue = new cocos2dx.classes.AsyncOperationQueue();
 
@@ -177,18 +185,38 @@ var LibraryCocosHelper = {
                     var ctx = canvas.getContext('2d');
                     ctx.drawImage(args.img, args.i, args.j, rw, rh, 0, 0, rw, rh);
 
-                    var imgData = ctx.getImageData(0, 0, rw, rh);
-                    var inImgData = _malloc(rw * rh * 4);
-                    Module.HEAP8.set(imgData.data, inImgData);
+                    if(this.runtimePremultiply)
+                    {
+                        var inImgData = _malloc(rw * rh * 4);
+                        var imgData = ctx.getImageData(0, 0, rw, rh);
+                        Module.HEAP8.set(imgData.data, inImgData);
 
-                    // Call into C++ code in CCTextureCacheEmscripten.cpp to do the actual
-                    // copy and pre-multiply.
-                    _CCTextureCacheEmscripten_preMultiplyImageRegion(
-                        inImgData, rw, rh,
-                        args.outImgData, args.w, args.h,
-                        args.i, args.j);
+                        // Call into C++ code in CCTextureCacheEmscripten.cpp to do the actual
+                        // copy and pre-multiply.
+                        _CCTextureCacheEmscripten_preMultiplyImageRegion(
+                            inImgData, rw, rh,
+                            args.outImgData, args.w, args.h,
+                            args.i, args.j);
 
-                    _free(inImgData);
+                        _free(inImgData);
+                    }
+                    else
+                    {
+                        // When not doing runtime pre-multiply, we just want to
+                        // copy the image data into the appropriate rectangle on
+                        // the target buffer. We use ArrayBuffer.set calls for each
+                        // row so as to make this as painless as possible.
+                        for(var j = 0; j < rh; j++)
+                        {
+                            // Still not totally satisfied that this is a win.
+                            // getImageData doesn't show up on profiles, nor
+                            // does the premultiply code, but it's also not
+                            // going any faster.
+                            var imgData = ctx.getImageData(0, j, rw, 1);
+                            var outOffset = 4 * ((j + args.j) * args.w + args.i);
+                            Module.HEAP8.set(imgData.data, args.outImgData + outOffset);
+                        }
+                    }
                 };
 
                 /**

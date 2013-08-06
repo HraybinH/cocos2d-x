@@ -100,7 +100,10 @@ SOURCES = ../Classes/AccelerometerTest/AccelerometerTest.cpp \
 
 RESOURCE_PATH = ../Resources
 
-RESOURCES := $(shell (cd $(RESOURCE_PATH); find . -type f ! -name '* *' ! -name '*.mp3'))
+# We process PNGs separately to the rest of the resources so that we can do
+# compile-time premultiply on them.
+RESOURCES := $(shell (cd $(RESOURCE_PATH); find . -type f ! -name '* *' ! -name '*.mp3' ! -name '*.png'))
+PNGS := $(shell (cd $(RESOURCE_PATH); find . -type f ! -name '* *' -name '*.png'))
 
 SHAREDLIBS = -lcocos2d -lcocosdenshion
 COCOS_LIBS = $(LIB_DIR)/libcocos2d.so $(LIB_DIR)/libcocosdenshion.so
@@ -127,18 +130,65 @@ $(TARGET).js: $(OBJECTS) $(COCOS_LIBS) $(CORE_MAKEFILE_LIST)
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $@ $(SHAREDLIBS) $(LIBS)
 
-$(TARGET).data: $(CORE_MAKEFILE_LIST) $(patsubst %,$(RESOURCE_PATH)/%,$(RESOURCES))
+$(OBJ_DIR)/Makefile.images: $(patsubst %,$(RESOURCE_PATH)/%,$(PNGS))
+	# This snippet generates a Makefile that will transcode images from normal,
+	# 8-bit-per-channel PNG, to pre-multiplied, max zlib compressed PNG.
+	# Pre-multiply saves a lot of runtime compute work. Note, this is also a
+	# great spot to apply compression to the images if that is desired.  Not
+	# that the "-quality" flag is interpreted differently for PNG files than
+	# JPEGs.
+	# 
+	# The approach of emitting a Makefile and then running it is used because
+	# this transcoding is actually moderately expensive (so can't just do a for
+	# loop in the rule as it would invoke the transcoding unnecessarily), and
+	# dynamically adding rules to a running Make for this is more complexity
+	# than I have time to deal with. This actually works pretty well.
+	(/bin/echo -n "all: "; \
+	imgs=`find $(RESOURCE_PATH) -iname "*.png"`; \
+	for i in $$imgs; do \
+		out=$(BIN_DIR)/`echo $$i | perl -pe "s@$(RESOURCE_PATH)@/@"`; \
+		/bin/echo -n "$$out "; \
+	done; \
+	echo; \
+	for i in $$imgs; do \
+		out=$(BIN_DIR)/`echo $$i | perl -pe "s@$(RESOURCE_PATH)@/@"`; \
+		(echo $$out: $$i; \
+		echo "\t"mkdir -p `dirname $$out`; \
+		echo "\t"echo $$out; \
+		echo "\t"convert \
+	   		-size \`identify -format \'%[fx:w]x%[fx:h]\' $(RESOURCE_PATH)/$$i\` xc:black \
+			-alpha on \
+			-draw \"image over 0,0 0,0 \'$(RESOURCE_PATH)/$$i\'\" \
+			-draw \"image copy-opacity 0,0 0,0 \'$(RESOURCE_PATH)/$$i\'\" \
+			-depth 8 -quality 95 \'$$out\'; \
+		echo); \
+	done) > $(OBJ_DIR)/Makefile.images
+
+$(TARGET).data: $(CORE_MAKEFILE_LIST) $(OBJ_DIR)/Makefile.images $(patsubst %,$(RESOURCE_PATH)/%,$(RESOURCES)) $(patsubst %,$(RESOURCE_PATH)/%,$(PNGS))
 	@mkdir -p $(@D)
 	$(eval RESTMP := $(shell mktemp -d /tmp/cocos-emscripten.XXXXXX))
 	# Always need a font path, so ensure that it is created first.
 	mkdir -p $(RESTMP)/fonts
 	(cd $(RESOURCE_PATH) && tar cf - $(RESOURCES)) | (cd $(RESTMP) && tar xvf -)
-	(cd $(RESTMP); python $(PACKAGER) $(EXECUTABLE).data $(patsubst %,--preload %,$(RESOURCES)) --preload fonts --pre-run > $(EXECUTABLE).data.js)
+	
+	# Now transcode PNG files into the temp output directory
+	(for i in $(PNGS); do \
+		mkdir -p `dirname $(RESTMP)/$$i`; \
+		(echo convert \
+			-size \`identify -format \'%[fx:w]x%[fx:h]\' $(RESOURCE_PATH)/$$i\` xc:black \
+			-alpha on \
+			-draw \"image over 0,0 0,0 \'$(RESOURCE_PATH)/$$i\'\" \
+			-draw \"image copy-opacity 0,0 0,0 \'$(RESOURCE_PATH)/$$i\'\" \
+			-depth 8 -quality 95 \'$(RESTMP)/$$i\') | sh -e; \
+	done)
+		
+	(cd $(RESTMP); python $(PACKAGER) $(EXECUTABLE).data $(patsubst %,--preload %,$(RESOURCES)) $(patsubst %,--preload %,$(PNGS)) --preload fonts --pre-run > $(EXECUTABLE).data.js)
 	mv $(RESTMP)/$(EXECUTABLE).data $@
 	mv $(RESTMP)/$(EXECUTABLE).data.js $@.js
-	# Copy the assets as individual files to the output directory in addition
-	# to building the .data file so that async texture loading works.
-	cp -av $(RESOURCE_PATH)/* $(shell dirname $@)
+	
+	# Copy all assets except PNG files.
+	rsync --exclude="*.png" --exclude="*.PNG" -rv $(RESOURCE_PATH)/ $(BIN_DIR)/
+	make $(MAKEFLAGS) -f $(OBJ_DIR)/Makefile.images all
 	rm -rf $(RESTMP)
 
 $(BIN_DIR)/index.html: index.html $(CORE_MAKEFILE_LIST)
