@@ -39,10 +39,18 @@ var LibrarySimpleAudioEngine = {
             curBackgroundMusicId: null
         };
 
-        soundManager.setup({
-            url: './',
-            flashVersion: 9
-        });
+        // Audio slows Android down (drops a ton of frames), and it's flakey
+        // anyway. Disable audio on Android for now. Can revisit in the future
+        // if this situation improves.
+        var ua = navigator.userAgent.toLowerCase();
+        var isAndroid = ua.indexOf("android") > -1;
+        if(!isAndroid)
+        {
+            soundManager.setup({
+                url: './',
+                flashVersion: 9
+            });
+        }
     },
 
     SimpleAudioEngine_playEffect: function(filenameP, loop)
