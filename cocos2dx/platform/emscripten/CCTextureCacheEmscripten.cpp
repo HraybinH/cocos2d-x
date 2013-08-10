@@ -43,13 +43,13 @@ void cocos2dx_shutdownAsyncImageLoader();
 extern "C" {
 // This C interface is exposed so that the JavaScript in
 // CCTextureCacheEmscripten.js is able to call into these functions.
-void CCTextureCacheEmscripten_addImageAsyncCallBack(CCTextureCacheEmscripten *tc, AsyncStruct *data, unsigned char *imgData, int width, int height);
+void CCTextureCacheEmscripten_addImageAsyncCallBack(CCTextureCacheEmscripten *tc, AsyncStruct *data, GLuint textureName, int width, int height);
 void CCTextureCacheEmscripten_preMultiplyImageRegion( unsigned char *in, int win, int hin, unsigned char *out, int wout, int hout, int xout, int yout);
 };
 
-void CCTextureCacheEmscripten_addImageAsyncCallBack(CCTextureCacheEmscripten *tc, AsyncStruct *data, unsigned char *imgData, int width, int height)
+void CCTextureCacheEmscripten_addImageAsyncCallBack(CCTextureCacheEmscripten *tc, AsyncStruct *data, GLuint textureName, int width, int height)
 {
-    tc->addImageAsyncCallBack_emscripten(data, imgData, width, height);
+    tc->addImageAsyncCallBack_emscripten(data, textureName, width, height);
 }
 
 /**
@@ -120,17 +120,12 @@ void CCTextureCacheEmscripten_preMultiplyImageRegion(
  * can be called from the C wrapper method
  * @CCTextureCacheEmscripten_addImageAsyncCallBack, above.
  */
-void CCTextureCacheEmscripten::addImageAsyncCallBack_emscripten(AsyncStruct *data, unsigned char *imgData, int width, int height)
+void CCTextureCacheEmscripten::addImageAsyncCallBack_emscripten(AsyncStruct *data, GLuint textureName, int width, int height)
 {
     const char *filename = data->filename.c_str();
 
-    CCImage *pImage = new CCImage();
-    pImage->initWithRawData((unsigned char*) imgData, 4 * width * height, width, height, 8, true);
-
-    free(imgData);
-
     CCTexture2D *texture = new CCTexture2D();
-    texture->initWithImage(pImage); 
+    texture->initWithGLTexture(textureName, width, height);
 
 #if CC_ENABLE_CACHE_TEXTURE_DATA
     // cache the texture file name
@@ -150,7 +145,6 @@ void CCTextureCacheEmscripten::addImageAsyncCallBack_emscripten(AsyncStruct *dat
         target->release();
     }
 
-    pImage->release();
     delete data;
 }
 

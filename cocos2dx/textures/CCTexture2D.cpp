@@ -173,6 +173,28 @@ bool CCTexture2D::hasPremultipliedAlpha()
     return m_bHasPremultipliedAlpha;
 }
 
+#ifdef EMSCRIPTEN
+bool CCTexture2D::initWithGLTexture(GLuint textureName, int width, int height)
+{
+    CCTexture2DPixelFormat pixelFormat = kCCTexture2DPixelFormat_RGBA8888;
+    m_uName = textureName;
+
+    m_uPixelsWide = width;
+    m_uPixelsHigh = height;
+    m_ePixelFormat = pixelFormat;
+    m_tContentSize = CCSizeMake((float)m_uPixelsWide, (float)m_uPixelsHigh);
+    m_fMaxS = m_tContentSize.width / (float)(width);
+    m_fMaxT = m_tContentSize.height / (float)(height);
+
+    m_bHasPremultipliedAlpha = true;
+    m_bHasMipmaps = false;
+
+    setShaderProgram(CCShaderCache::sharedShaderCache()->programForKey(kCCShader_PositionTexture));
+
+    return true;
+}
+#endif // EMSCRIPTEN
+
 bool CCTexture2D::initWithData(const void *data, CCTexture2DPixelFormat pixelFormat, unsigned int pixelsWide, unsigned int pixelsHigh, const CCSize& contentSize)
 {
     unsigned int bitsPerPixel;

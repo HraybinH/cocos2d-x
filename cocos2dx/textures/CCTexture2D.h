@@ -121,6 +121,10 @@ public:
     void releaseData(void *data);
     void* keepData(void *data, unsigned int length);
 
+#ifdef EMSCRIPTEN
+    bool initWithGLTexture(GLuint textureName, int width, int height);
+#endif // EMSCRIPTEN
+
     /** Initializes with a texture2d with data */
     bool initWithData(const void* data, CCTexture2DPixelFormat pixelFormat, unsigned int pixelsWide, unsigned int pixelsHigh, const CCSize& contentSize);
 

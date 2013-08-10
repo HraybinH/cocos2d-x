@@ -234,33 +234,30 @@ var LibraryCocosHelper = {
 
                     img.onload = function()
                     {
-                        var w = img.width;
-                        var h = img.height;
-                        var outImgData = _malloc(w * h * 4);
+                        // This delicate tango is so that we can use WebGL's
+                        // texture loading methods directly, but maintain
+                        // Emscripten's GL emulation layer's state with as
+                        // little sleaze as possible. The objective is to use
+                        // the fastest path to loading texture data possible,
+                        // but to still be able to take advantage of the OpenGL
+                        // emulation.
+                        var p_texName = _malloc(4); // sizeof(GLuint) == 4.
+                        _glGenTextures(1, p_texName);
+                        var textureId = getValue(p_texName, 'i32');
+                        _free(p_texName);
 
-                        for(var i = 0; i < w; i += that.regionSize)
-                        {
-                            for(var j = 0; j < h; j += that.regionSize)
-                            {
-                                var args = {
-                                    i: i, j: j,
-                                    w: w, h: h,
-                                    img: img,
-                                    outImgData: outImgData
-                                };
-                                that.operationQueue.enqueue(function(a) { that._blitAndPremultipyRegion(a); }, args);
-                            }
-                        }
+                        var gl = Module.ctx;
+                        _glActiveTexture(gl.TEXTURE0);
+                        _glBindTexture(gl.TEXTURE_2D, textureId);
 
-                        var fireCallback = function(args) {
-                            _CCTextureCacheEmscripten_addImageAsyncCallBack(that.cxxTextureCache, args.asyncData, args.imgData, args.w, args.h);
-                        };
-                        var opArgs = {
-                            asyncData: asyncData,
-                            imgData: outImgData,
-                            w: w, h: h
-                        };
-                        that.operationQueue.enqueue(fireCallback, opArgs);
+                        _glTexParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR );
+                        _glTexParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR );
+                        _glTexParameteri( gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE );
+                        _glTexParameteri( gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE );
+
+                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+
+                        _CCTextureCacheEmscripten_addImageAsyncCallBack(that.cxxTextureCache, asyncData, textureId, img.width, img.height);
                     };
 
                     img.onerror = function()
